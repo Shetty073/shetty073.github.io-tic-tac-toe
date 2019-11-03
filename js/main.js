@@ -1,5 +1,7 @@
 // @author: Ashish Shetty
 
+// TODO: Fix bugs related to checkDraw() and player swap
+
 const winPositions = {
     "place00": [["place00", "place01", "place02"], ["place00", "place10", "place20"], ["place00", "place11", "place22"]],
     "place01": [["place00", "place01", "place02"], ["place01", "place11", "place21"]],
@@ -12,18 +14,23 @@ const winPositions = {
     "place22": [["place02", "place12", "place22"], ["place00", "place11", "place22"], ["place20", "place21", "place22"]]
 };
 
+
 let gameData = {
     humanplayer: '',
     aiplayer: '',
     wins: 0,
-    totalgamesplayed: 0
+    totalgamesplayed: 0,
+    humanplayerlastmove: ""
 };
+
 
 let ply = 0; // 0=human player's turn and 1=computer player's turn
 
+
 document.getElementById("x-button").addEventListener("click",function() { player('x', 'o') }, false);
 document.getElementById("o-button").addEventListener("click",function() { player('o', 'x') }, false);
-document.getElementById("reset-button").addEventListener("click", resetBoard);
+document.getElementById("reset-button").addEventListener("click", reset);
+
 
 function player(human, ai) {
     if (gameData.humanplayer === '') {
@@ -44,7 +51,15 @@ function player(human, ai) {
     }
 }
 
+
+function reset() {
+    //This basically reload the entire page
+    document.location.reload();
+}
+
+
 function resetBoard() {
+    // This will just reset the board and give control back to AI player
     for (let i=0; i<3; i++) {
         for (let j=0; j<3; j++) {
             document.getElementById("place"+String(i)+String(j)).innerHTML = '';
@@ -52,11 +67,12 @@ function resetBoard() {
     }
 
     // Timout set to make the computers moves feel natural
-    setTimeout(function () { checkCurrentPlayer();} , 800);
+    setTimeout(function () { checkCurrentPlayer(); } , 800);
     // gameData.humanplayer = '';
     // gameData.wins = '';
     // gameData.totalgamesplayed = '';
 }
+
 
 function checkCurrentPlayer() {
     if (gameData.humanplayer === 'x') {
@@ -67,6 +83,7 @@ function checkCurrentPlayer() {
         setTimeout( function () { AImove(); },800);
     }
 }
+
 
 function getEmptyPool() {
     let emptyLocPool = [];
@@ -92,11 +109,12 @@ function getEmptyPool() {
     return emptyLocPool;
 }
 
+
 function checkWin(player, place) {
     let possibleWinPositions = winPositions[place];
     for (let x of possibleWinPositions) {
         if (((document.getElementById(x[0]).innerHTML) === (document.getElementById(x[1]).innerHTML)) && ((document.getElementById(x[0]).innerHTML) === (document.getElementById(x[2]).innerHTML))) {
-            // first swap humanplayer symbol with computer player symbol i.i is human is X next turn (after a win/loss/tie) he will be O
+            // first swap humanplayer symbol with computer player symbol i.e. if is human is X then next turn (after a win/loss/tie) he will be O
             let temp = gameData.humanplayer;
             gameData.humanplayer = gameData.aiplayer;
             gameData.aiplayer = temp;
@@ -106,13 +124,30 @@ function checkWin(player, place) {
     }
 }
 
+
+function checkDraw() {
+    let emptyLocPool = getEmptyPool();
+    if (emptyLocPool.length === 0) {
+        let temp = gameData.humanplayer;
+        gameData.humanplayer = gameData.aiplayer;
+        gameData.aiplayer = temp;
+        setTimeout(function() { alert("It is a tie!\nThe board will now reset"); }, 500);
+        setTimeout(function () { resetBoard(); }, 1000);
+        return true;
+    }
+}
+
+
 function playerMove(place) {
+    gameData.humanplayerlastmove = place;
     if (ply === 0) {
         let loc = document.getElementById(place);
         if (loc.innerHTML !== '') {
             // console.log(loc.innerHTML);
         } else {
             loc.innerHTML = gameData.humanplayer;
+            // Reset board if it's a tie
+            checkDraw();
         }
         if (checkWin("You", place)) {
             setTimeout(function() { alert("Congratulations! You have won\nThe board will now reset"); }, 500);
@@ -121,7 +156,9 @@ function playerMove(place) {
         } else {
             ply = 1;
             // Timout set to make the computers moves feel natural
-            setTimeout( function () { AImove(); },800);
+            if (!checkDraw()) {
+                setTimeout( function () { AImove(); },800);
+            }
             // AImove();
         }
     } else {
@@ -129,28 +166,103 @@ function playerMove(place) {
     }
 }
 
-function AImove() {
-    if (ply === 1) {
-        // TODO: add intelligent AI logic
 
-        // Dumb AI
-        // Computer will place symbol on a random empty space
-        // Will implement MinMax algo AI later
-        let emptyLocPool = getEmptyPool();
-        if (emptyLocPool.length === 0) {
-            setTimeout(function() { alert("It is a tie!"); }, 500);
-            setTimeout(function () { resetBoard(); }, 1000);
-        } else {
+function AImove() {
+    // TODO: AI with difficulty levels
+    let emptyLocPool = getEmptyPool();
+    if (ply === 1) {
+        if (gameData.humanplayerlastmove === '') {
             let location = document.getElementById(emptyLocPool[0]);
+            console.log(location);
             location.innerHTML = gameData.aiplayer;
             if (checkWin("Computer", emptyLocPool[0])) {
                 setTimeout(function() { alert("Computer won!\nThe board will now reset"); }, 500);
                 setTimeout(function () { resetBoard(); }, 1000);
             }
+            ply = 0;
+        } else {
+            let choices = winPositions[gameData.humanplayerlastmove];
+            for (let x of choices) {
+                if ((document.getElementById(x[0]).innerHTML) === (document.getElementById(x[1]).innerHTML) && (document.getElementById(x[0]).innerHTML === gameData.humanplayer) && (document.getElementById(x[2]).innerHTML === '')) {
+                    console.log(x);
+                    document.getElementById(x[2]).innerHTML = gameData.aiplayer;
+                    ply = 0;
+
+                    if (checkWin("Computer", x[2])) {
+                        setTimeout(function () {
+                            alert("Computer won!\nThe board will now reset");
+                        }, 500);
+                        setTimeout(function () {
+                            resetBoard();
+                        }, 1000);
+                    }
+                    checkDraw();
+                    return;
+                } else if ((document.getElementById(x[1]).innerHTML) === (document.getElementById(x[2]).innerHTML) && (document.getElementById(x[1]).innerHTML === gameData.humanplayer) && (document.getElementById(x[0]).innerHTML === '')) {
+                    console.log(x);
+                    document.getElementById(x[0]).innerHTML = gameData.aiplayer;
+                    ply = 0;
+
+                    if (checkWin("Computer", x[0])) {
+                        setTimeout(function () {
+                            alert("Computer won!\nThe board will now reset");
+                        }, 500);
+                        setTimeout(function () {
+                            resetBoard();
+                        }, 1000);
+                    }
+                    checkDraw();
+                    return;
+                } else if ((document.getElementById(x[0]).innerHTML) === (document.getElementById(x[2]).innerHTML) && (document.getElementById(x[0]).innerHTML === gameData.humanplayer) && (document.getElementById(x[1]).innerHTML === '')) {
+                    console.log(x);
+                    document.getElementById(x[1]).innerHTML = gameData.aiplayer;
+                    ply = 0;
+
+                    if (checkWin("Computer", x[1])) {
+                        setTimeout(function () {
+                            alert("Computer won!\nThe board will now reset");
+                        }, 500);
+                        setTimeout(function () {
+                            resetBoard();
+                        }, 1000);
+                    }
+                    checkDraw();
+                    return;
+                }
+            }
+
+
+            console.log(emptyLocPool);
+            let location = document.getElementById(emptyLocPool[0]);
+            console.log(location);
+            location.innerHTML = gameData.aiplayer;
+            ply = 0;
+            if (checkWin("Computer", emptyLocPool[0])) {
+                setTimeout(function () {
+                    alert("Computer won!\nThe board will now reset");
+                }, 500);
+                setTimeout(function () {
+                    resetBoard();
+                }, 1000);
+            }
+            checkDraw();
         }
-        ply = 0;
+        // let emptyLocPool = getEmptyPool();
+        // if (emptyLocPool.length === 0) {
+        //     setTimeout(function() { alert("It is a tie!"); }, 500);
+        //     setTimeout(function () { resetBoard(); }, 1000);
+        // } else {
+        //     let location = document.getElementById(emptyLocPool[0]);
+        //     location.innerHTML = gameData.aiplayer;
+        //     if (checkWin("Computer", emptyLocPool[0])) {
+        //         setTimeout(function() { alert("Computer won!\nThe board will now reset"); }, 500);
+        //         setTimeout(function () { resetBoard(); }, 1000);
+        //     }
+        // }
+        // ply = 0;
     }
 }
+
 
 function startGame() {
     gameData.totalgamesplayed += 1;
